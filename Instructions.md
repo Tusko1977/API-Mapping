@@ -1,0 +1,4 @@
+Only using and adding files within this folder,
+I want to create an application that looks like the image in the folder. It will be a grid with seven columns. The columns will be Name (99 char), Description (1000 varchar), Tables Affected (255 varchar), Verb (6 char), Resource (15 char), Edit Delete Function. 
+It will have a SEARCH function and an ADD ROW function
+For this proof of concept, I want this to be in React Next JS, using Tailwind, using Mongo DB, and hosted in Vercel. Once proved, I want to host this in IIS using a sql database. I need it to have GET, CREATE, UPDATE and DELETE endpoints that I can call from Postman for testing
