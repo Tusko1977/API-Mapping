@@ -29,6 +29,13 @@ const EMPTY_INPUT: EntityInput = {
 
 const NEW_ROW = "new";
 
+// In production this is served from the same IIS site as the API (see
+// api/Program.cs), so relative "/api/..." URLs just work - leave
+// NEXT_PUBLIC_API_BASE_URL unset. For local dev, where `next dev` (port 3000)
+// and `dotnet run` (port 5068) are separate origins, set it in .env.local to
+// e.g. http://localhost:5068 - the API's dev CORS policy allows that origin.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
 type Editing = {
   id: string; // entity id, or NEW_ROW
   draft: EntityInput;
@@ -54,7 +61,7 @@ export default function EntityGrid() {
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/entities?search=${encodeURIComponent(search)}`, {
+        const res = await fetch(`${API_BASE}/api/entities?search=${encodeURIComponent(search)}`, {
           signal: controller.signal,
         });
         if (!res.ok) throw new Error(`Failed to load entities (${res.status}).`);
@@ -111,7 +118,7 @@ export default function EntityGrid() {
     setEditing({ ...editing, saving: true });
 
     try {
-      const res = await fetch(isNew ? "/api/entities" : `/api/entities/${editing.id}`, {
+      const res = await fetch(isNew ? `${API_BASE}/api/entities` : `${API_BASE}/api/entities/${editing.id}`, {
         method: isNew ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing.draft),
@@ -132,7 +139,7 @@ export default function EntityGrid() {
   async function confirmDelete(id: string) {
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/entities/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/entities/${id}`, { method: "DELETE" });
       if (!res.ok && res.status !== 404) throw new Error();
       setEntities((prev) => prev.filter((x) => x.id !== id));
     } catch {
@@ -178,7 +185,7 @@ export default function EntityGrid() {
                   </option>
                 ))}
               </select>
-            ) : field === "description" ? (
+            ) : field === "description" || field === "tablesAffected" ? (
               <textarea
                 value={draft.description}
                 maxLength={FIELD_LIMITS.description}
@@ -200,6 +207,11 @@ export default function EntityGrid() {
             {field === "description" && (
               <div className="mt-0.5 text-right text-xs text-gray-400">
                 {draft.description.length}/{FIELD_LIMITS.description}
+              </div>
+            )}
+            {field === "tablesAffected" && (
+              <div className="mt-0.5 text-right text-xs text-gray-400">
+                {draft.tablesAffected.length}/{FIELD_LIMITS.tablesAffected}
               </div>
             )}
             {errors[field] && <div className="mt-0.5 text-xs text-red-600">{errors[field]}</div>}
