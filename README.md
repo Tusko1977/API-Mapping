@@ -1,6 +1,8 @@
 # API Mapping Catalogue
 
-A proof-of-concept CRUD grid built with Next.js (React), Tailwind CSS and MongoDB, deployable to Vercel.
+A CRUD grid: a static Next.js (React) + Tailwind CSS frontend, backed by an ASP.NET Core
+Minimal API against SQL Server, both hosted as one IIS site. (Originally a MongoDB/Vercel
+proof of concept - see git history if you need that version.)
 
 ## Columns
 
@@ -17,21 +19,41 @@ All fields are required (blank or whitespace-only values are rejected).
 The **URL/Mutation + Verb** combination must be unique (case-insensitive), so `AccountHeader`/GET and
 `AccountHeader`/POST can both exist, but not two `AccountHeader`/GET rows.
 
+## Database
+
+Run once per environment, in SSMS, in order:
+
+1. `db/001_create_database.sql` - creates the `ITAS_API_Mapping` database and `dbo.Entities` table.
+2. `db/002_create_app_login.sql` - grants the app's identity (`HIVEDOME\dev02_itas_svc`, the shared
+   Windows service account used by other apps on this instance) read/write access.
+
+Both scripts are idempotent - safe to re-run.
+
 ## Run locally
 
-1. Install **Node.js 20 LTS or newer** from https://nodejs.org (includes `npm`).
-2. In this folder, install dependencies:
-   ```
-   npm install
-   ```
-3. Copy `.env.example` to `.env.local` and put your MongoDB connection string in `MONGODB_URI`.
-   (In MongoDB Atlas: Database → Connect → Drivers. Also allow your IP under Network Access.)
-   The `entities` collection is created automatically on first insert.
-4. Start the dev server:
-   ```
-   npm run dev
-   ```
-5. Open http://localhost:3000
+Two processes, running side by side:
+
+**API** (`api/`, ASP.NET Core, .NET 10 SDK required):
+```
+cd api
+copy appsettings.Local.json.example appsettings.Local.json
+```
+Edit `appsettings.Local.json` if your connection needs differ from the template, then:
+```
+dotnet run
+```
+Runs on http://localhost:5068 by default. Uses Windows Authentication (`Trusted_Connection=True`) -
+your own Windows login needs `db_datareader`/`db_datawriter` on `ITAS_API_Mapping` for this to work
+locally (separate from the service account used in production - ask your DBA).
+
+**Frontend** (repo root, Node.js 20 LTS+ required):
+```
+npm install
+copy .env.example .env.local
+npm run dev
+```
+Open http://localhost:3000. `.env.local`'s `NEXT_PUBLIC_API_BASE_URL` points the frontend at the
+API running on a different port; the API's dev CORS policy allows `localhost:3000`.
 
 ## API endpoints
 
@@ -50,43 +72,24 @@ missing ids return `404`.
 ### Postman
 
 Import `postman/ApiMappingCatalogue.postman_collection.json`. Set the `baseUrl` collection variable
-(default `http://localhost:3000`). Running **Create entity** saves the new id into `entityId`,
-which Get / Update / Delete use.
+to wherever the API is running (`http://localhost:5068` locally; the deployed IIS site's URL once
+that's set up). Running **Create entity** saves the new id into `entityId`, which Get / Update /
+Delete use.
 
-## Deploy to Vercel
+## Building for IIS
 
-1. Push this folder to a GitHub repository (`.env.local` is git-ignored and won't be pushed).
-2. In Vercel, **Add New → Project** and import the repository (framework is detected as Next.js).
-3. Under **Settings → Environment Variables**, add `MONGODB_URI` (and optionally `MONGODB_DB`).
-4. In MongoDB Atlas **Network Access**, allow `0.0.0.0/0`, since Vercel does not use fixed IPs.
-5. Deploy, then point Postman's `baseUrl` at your Vercel URL.
+```
+npm run build:iis
+```
 
-## Moving to IIS + SQL Server later
+Runs `next build` (static export, per `output: "export"` in `next.config.mjs`) and copies the
+result into `api/wwwroot`. The ASP.NET Core app serves that as static files alongside its own
+`/api/*` endpoints (`app.UseStaticFiles()` in `api/Program.cs`), so the whole app - frontend and
+API - is one deployable unit and one IIS site once published. `api/wwwroot` is git-ignored, since
+it's build output; run this before every publish.
 
-All database access goes through the `EntityRepository` interface in `src/lib/repository.ts`.
-To switch to SQL Server:
-
-1. Create a table matching the column limits above, e.g.
-   ```sql
-   CREATE TABLE Entities (
-     Id             INT IDENTITY PRIMARY KEY,
-     Name           NVARCHAR(150)  NOT NULL,
-     Description    NVARCHAR(255)  NOT NULL,
-     TablesAffected NVARCHAR(255)  NOT NULL,
-     Verb           NVARCHAR(6)    NOT NULL,
-     Resource       NVARCHAR(15)   NOT NULL,
-     CreatedAt      DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
-     UpdatedAt      DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME(),
-     CONSTRAINT UQ_Entities_Name_Verb UNIQUE (Name, Verb)  -- case-insensitive under the default collation
-   );
-   ```
-2. Add a `SqlEntityRepository` (e.g. using the `mssql` package) implementing the same five methods,
-   and change the export at the bottom of `src/lib/repository.ts`. Map SQL unique-constraint
-   violations (error 2627 / 2601) to `DuplicateEntityError`.
-3. Host on IIS by running `npm run build` and `npm start` behind IIS using the
-   URL Rewrite + Application Request Routing (reverse proxy) modules, or iisnode.
-
-The UI and API routes don't need to change.
+IIS site configuration itself (ASP.NET Core Module install, app pool identity, bindings) is a
+separate step, not yet documented here.
 
 ## Project layout
 
@@ -94,13 +97,16 @@ The UI and API routes don't need to change.
 src/
   app/
     page.tsx                     Page shell
-    api/entities/route.ts        GET (list/search), POST
-    api/entities/[id]/route.ts   GET, PUT, DELETE
+    layout.tsx, globals.css
   components/EntityGrid.tsx      Grid, search, add/edit/delete UI
-  lib/
-    entity.ts                    Field limits, types, validation
-    repository.ts                Storage interface (swap point for SQL)
-    mongoEntityRepository.ts     MongoDB implementation
-    mongodb.ts                   Connection handling
-postman/                         Postman collection
+  lib/entity.ts                  Field limits, types, client-side validation
+api/                              ASP.NET Core Minimal API (.NET 10)
+  Program.cs                      Endpoint mappings + static file hosting
+  Entities/                       Entity model, request DTO, validation
+  Data/                           IEntityRepository + SqlEntityRepository (Dapper)
+  Api/ApiResults.cs               Shared response helpers
+  appsettings.Local.json.example  Connection string template (copy -> appsettings.Local.json)
+db/                                SQL Server setup scripts (run in SSMS)
+scripts/copy-export-to-api.mjs    Used by `npm run build:iis`
+postman/                          Postman collection
 ```

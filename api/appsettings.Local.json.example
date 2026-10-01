@@ -1,0 +1,18 @@
+// Copy this file to appsettings.Local.json and fill in your real values.
+// appsettings.Local.json is git-ignored and never leaves your machine.
+// This file is loaded on top of appsettings.json (see Program.cs), so it
+// only needs to contain the settings you're overriding.
+{
+  "ConnectionStrings": {
+    // Windows Authentication as HIVEDOME\dev02_itas_svc (db/002_create_app_login.sql),
+    // the same shared service account other apps on this instance already use
+    // (e.g. ItasMetadata2's "trusted_connection=yes"). This only works when the
+    // process running the app (dotnet run, or the IIS app pool later) is itself
+    // running as that account - see README for how that's configured in IIS.
+    "Default": "Server=HDM-TY-SQL01\\TOOLS01;Database=ITAS_API_Mapping;Trusted_Connection=True;Encrypt=true;TrustServerCertificate=true"
+
+    // Fallback: SQL Authentication (db/002_create_app_login.sql, commented-out section) -
+    // only needed if Windows Auth isn't usable for some environment:
+    // "Default": "Server=HDM-TY-SQL01\\TOOLS01;Database=ITAS_API_Mapping;User Id=api_mapping_app;Password=<password>;Encrypt=true;TrustServerCertificate=true"
+  }
+}
