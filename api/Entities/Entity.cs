@@ -8,7 +8,7 @@ public static class FieldLimits
 {
     public const int Name = 150;
     public const int Description = 255;
-    public const int TablesAffected = 255;
+    public const int TablesAffected = 500;
     public const int Verb = 6;
     public const int Resource = 15;
 }

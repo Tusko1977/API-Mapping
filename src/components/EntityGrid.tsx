@@ -185,7 +185,7 @@ export default function EntityGrid() {
                   </option>
                 ))}
               </select>
-            ) : field === "description" || field === "tablesAffected" ? (
+            ) : field === "description" ? (
               <textarea
                 value={draft.description}
                 maxLength={FIELD_LIMITS.description}
@@ -193,6 +193,15 @@ export default function EntityGrid() {
                 onChange={(e) => updateDraft("description", e.target.value)}
                 onKeyDown={onEditKeyDown}
                 className={`${inputClass("description")} resize-y`}
+              />
+            ) : field === "tablesAffected" ? (
+              <textarea
+                value={draft.tablesAffected}
+                maxLength={FIELD_LIMITS.tablesAffected}
+                rows={2}
+                onChange={(e) => updateDraft("tablesAffected", e.target.value)}
+                onKeyDown={onEditKeyDown}
+                className={`${inputClass("tablesAffected")} resize-y`}
               />
             ) : (
               <input
