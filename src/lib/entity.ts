@@ -3,7 +3,7 @@
 export const FIELD_LIMITS = {
   name: 150,
   description: 255,
-  tablesAffected: 255,
+  tablesAffected: 500,
   verb: 6,
   resource: 15,
 } as const;
